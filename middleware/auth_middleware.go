@@ -19,7 +19,7 @@ var jwtKey = []byte("secret_key")
 
 func AuthMW(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("middleware", r.URL)
+		//fmt.Println("middleware", r.URL)
 		bearer := r.Header.Get("Authorization")
 		if bearer == "" {
 			w.WriteHeader(http.StatusBadRequest)

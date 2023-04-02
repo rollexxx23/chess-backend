@@ -18,6 +18,7 @@ func initializeRouter() {
 	r.HandleFunc("/forgot-password", utils.RequestForgotPassword)
 	r.HandleFunc("/refresh", utils.Refresh).Methods("GET").Methods("GET")
 	r.HandleFunc("/forgot-password/{token}", utils.ForgotPassword).Methods("PUT")
+	r.HandleFunc("/lobby", utils.LobbyEndpoint)
 	log.Fatal(http.ListenAndServe(":5000", r))
 }
 
