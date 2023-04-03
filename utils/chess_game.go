@@ -101,18 +101,104 @@ func playMove(game *ChessGame, move GameMove) error {
 
 	text, _ := json.Marshal(moveSnd)
 	if game.WhiteTurn {
-		fmt.Println(game.blackPlayer)
 		Directory.EmailToSocketMap[game.blackPlayer].WriteMessage(1, []byte(text))
 	} else {
 		Directory.EmailToSocketMap[game.whitePlayer].WriteMessage(1, []byte(text))
 	}
 	if game.validator.Outcome() != chess.NoOutcome {
 		// game end logic
+		gameEndLogic(game.ID)
+		Directory.EmailToSocketMap[game.blackPlayer].WriteMessage(1, []byte("game over"))
+		Directory.EmailToSocketMap[game.whitePlayer].WriteMessage(1, []byte("game over"))
 	}
 
 	game.WhiteTurn = !game.WhiteTurn
 	game.gameMoves = append(game.gameMoves, move)
 
+	return nil
+}
+
+func gameEndLogic(id int) {
+	fmt.Println("called...")
+	chessgame := ActiveMatches.Match[id]
+	//now store game in MySQL database
+	allMoves, err := json.Marshal(chessgame.gameMoves)
+	if err != nil {
+		fmt.Println("Error marshalling data to store in MySQL")
+	}
+	updateCnt(chessgame)
+	//gets length of all the moves in the game
+	totalMoves := (len(chessgame.gameMoves) + 1) / 2
+	storeGame(totalMoves, string(allMoves), chessgame)
+
+	//now delete game from memory
+	delete(ActiveMatches.Match, id)
+}
+
+func updateCnt(chessGame *ChessGame) {
+	if chessGame.validator.Outcome() == chess.BlackWon {
+		chessGame.Result = 0
+		var users []models.User
+		// find black and add 1 to win counter
+		database.Instance.Where("email = ?", chessGame.blackPlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].WinCnt = users[0].WinCnt + 1
+		}
+		database.Instance.Save(users)
+		// find white and add 1 to loss counter
+
+		database.Instance.Where("email = ?", chessGame.whitePlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].LossCnt = users[0].LossCnt + 1
+		}
+		database.Instance.Save(users)
+	} else if chessGame.validator.Outcome() == chess.WhiteWon {
+		chessGame.Result = 1
+		var users []models.User
+		// find black and add 1 to win counter
+		database.Instance.Where("email = ?", chessGame.whitePlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].WinCnt = users[0].WinCnt + 1
+		}
+		database.Instance.Save(users)
+		// find white and add 1 to loss counter
+
+		database.Instance.Where("email = ?", chessGame.blackPlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].LossCnt = users[0].LossCnt + 1
+		}
+		database.Instance.Save(users)
+	} else {
+		chessGame.Result = 2
+		var users []models.User
+
+		database.Instance.Where("email = ?", chessGame.blackPlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].DrawCnt = users[0].DrawCnt + 1
+		}
+		database.Instance.Save(users)
+
+		database.Instance.Where("email = ?", chessGame.whitePlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].DrawCnt = users[0].DrawCnt + 1
+		}
+		database.Instance.Save(users)
+	}
+}
+
+func storeGame(moveCnt int, moves string, chessgame *ChessGame) error {
+
+	game := models.Match{
+		WhitePlayerUserName: chessgame.WhitePlayerUserName,
+		BlackPlayerUserName: chessgame.BlackPlayerUserName,
+		WhitePlayer:         chessgame.whitePlayer,
+		BlackPlayer:         chessgame.blackPlayer,
+		GameMoves:           moves,
+		Moves:               moveCnt,
+		Result:              chessgame.Result,
+		Comment:             chessgame.validator.Outcome().String(),
+	}
+	database.Instance.Create(&game)
 	return nil
 }
 

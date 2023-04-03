@@ -11,6 +11,9 @@ type User struct {
 	Username string `json:"username" gorm:"unique"`
 	Email    string `json:"email" gorm:"unique"`
 	Password string `json:"password"`
+	WinCnt   int    `json:"win_cnt" gorm:"default:0"`
+	LossCnt  int    `json:"loss_cnt" gorm:"default:0"`
+	DrawCnt  int    `json:"draw_cnt" gorm:"default:0"`
 }
 
 func (user *User) HashPassword(password string) error {
