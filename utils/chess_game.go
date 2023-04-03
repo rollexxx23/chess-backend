@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"math/rand"
 
 	"github.com/notnil/chess"
@@ -15,21 +18,28 @@ type ChessGame struct {
 	whitePlayer         string // email
 	blackPlayer         string
 	gameMoves           []GameMove //list of moves
-	Status              uint8      `json:"status"`       // 0 -> white to move, 1 -> black to move, 2 -> white won, 3 -> black won, 4 -> draw
-	Result              uint8      `json:"result"`       // 0 -> black, 1 -> white, 2 -> draw
-	PendingDraw         bool       `json:"pendind_draw"` //draw offer cnt
-	validator           *chess.Game
+
+	Result      uint8 `json:"result"`       // 0 -> black, 1 -> white, 2 -> draw
+	PendingDraw bool  `json:"pendind_draw"` //draw offer cnt
+	validator   *chess.Game
 
 	WhiteTurn bool `json:"white_move"` // white -> true
 }
 
 type GameMove struct {
-	Type string
-	ID   int
-	Src  string
-	Dest string
-	Prom string
-	Fen  string // current FEN
+	Email string
+	ID    int
+	Src   string
+	Dest  string
+	Prom  string
+	Fen   string // current FEN
+}
+
+type sndMoveStruct struct {
+	GameId int    `json:"game_id"`
+	Src    string `json:"src"`
+	Dest   string `json:"des"`
+	Prom   string `json:"prom"`
 }
 
 func initGame(player1, player2 string) (int, ChessGame) {
@@ -55,9 +65,60 @@ func initGame(player1, player2 string) (int, ChessGame) {
 		game.whitePlayer = player2
 	}
 	// init struct
-	game.Status = 0
+
 	game.gameMoves = nil
 	game.validator = chess.NewGame(chess.UseNotation(chess.UCINotation{}))
 	game.WhiteTurn = true
 	return game.ID, game
 }
+
+func playMove(game *ChessGame, move GameMove) error {
+
+	if game.WhiteTurn {
+		if move.Email != game.whitePlayer {
+			return errors.New("Not Your Turn")
+		}
+	} else {
+		if move.Email != game.blackPlayer {
+			return errors.New("Not Your Turn")
+		}
+	}
+
+	err := game.validator.MoveStr(move.Src + move.Dest + move.Prom)
+
+	if err != nil {
+		fmt.Println("Could not decode", err, move.Src+move.Dest+move.Prom)
+		return err
+	}
+
+	// send move to opponent
+	moveSnd := sndMoveStruct{
+		GameId: game.ID,
+		Src:    move.Src,
+		Dest:   move.Dest,
+		Prom:   move.Prom,
+	}
+
+	text, _ := json.Marshal(moveSnd)
+	if game.WhiteTurn {
+		fmt.Println(game.blackPlayer)
+		Directory.EmailToSocketMap[game.blackPlayer].WriteMessage(1, []byte(text))
+	} else {
+		Directory.EmailToSocketMap[game.whitePlayer].WriteMessage(1, []byte(text))
+	}
+	if game.validator.Outcome() != chess.NoOutcome {
+		// game end logic
+	}
+
+	game.WhiteTurn = !game.WhiteTurn
+	game.gameMoves = append(game.gameMoves, move)
+
+	return nil
+}
+
+/*
+
+{"token": "1234","email": "arin2@gmail.com","game_id": 499379,"src": "d2","des": "d4","prom": ""}
+
+
+*/

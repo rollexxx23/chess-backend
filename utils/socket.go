@@ -25,9 +25,17 @@ var Directory = struct {
 }{EmailToSocketMap: make(map[string]*websocket.Conn)}
 
 type findMatchMsgStruct struct {
-	Token       string `json:"token"`
-	Email       string `json:"email"`
-	MessageType string `json:"message_type"`
+	Token string `json:"token"`
+	Email string `json:"email"`
+}
+
+type movesMsgStruct struct {
+	Token  string `json:"token"`
+	Email  string `json:"email"`
+	GameId int    `json:"game_id"`
+	Src    string `json:"src"`
+	Dest   string `json:"des"`
+	Prom   string `json:"prom"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -72,6 +80,37 @@ func findMatch(conn *websocket.Conn) error {
 
 }
 
+func getMoves(conn *websocket.Conn) error {
+	for {
+		_, p, err := conn.ReadMessage()
+		if err != nil {
+			return err
+		}
+
+		var req movesMsgStruct
+		err = json.Unmarshal(p, &req)
+		if err != nil {
+			return err
+		}
+
+		move := GameMove{
+			ID:    req.GameId,
+			Src:   req.Src,
+			Email: req.Email,
+			Dest:  req.Dest,
+			Prom:  req.Prom,
+		}
+
+		game := ActiveMatches.Match[req.GameId]
+
+		err = playMove(game, move)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+}
+
 func LobbyEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	// upgrade this connection to a WebSocket
@@ -86,6 +125,8 @@ func LobbyEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	err = getMoves(ws)
 }
 
 func LobbyConnect(conn *websocket.Conn, m findMatchMsgStruct) []byte {
@@ -116,5 +157,5 @@ func LobbyConnect(conn *websocket.Conn, m findMatchMsgStruct) []byte {
 }
 
 /*
-{"message_type":"find_match", "token":"abc", "email": "abc"}
+{"message_type":"find_match", "token":"abc", "email": "arin2@gmail.com"}
 */
