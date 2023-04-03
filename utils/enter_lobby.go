@@ -3,19 +3,28 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var MatchReqs = struct {
 	sync.RWMutex
-	Lobby map[string]*websocket.Conn // email -> socket
+	Lobby map[string]*websocket.Conn // currently searching for matches
 }{Lobby: make(map[string]*websocket.Conn)}
 
-type MessageStruct struct {
+var ActiveMatches = struct {
+	sync.RWMutex
+	Match map[int]*ChessGame
+}{Match: make(map[int]*ChessGame)}
+
+var Directory = struct {
+	EmailToSocketMap map[string]*websocket.Conn
+}{EmailToSocketMap: make(map[string]*websocket.Conn)}
+
+type findMatchMsgStruct struct {
 	Token       string `json:"token"`
 	Email       string `json:"email"`
 	MessageType string `json:"message_type"`
@@ -27,29 +36,39 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-func reader(conn *websocket.Conn) error {
-	for {
-		// read in a message
-		messageType, p, err := conn.ReadMessage()
-		if err != nil {
-			return err
-		}
+func findMatch(conn *websocket.Conn) error {
 
-		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return err
-		}
-		var req MessageStruct
-		err = json.Unmarshal(p, &req)
-		if err != nil {
-			return err
-		}
+	// read in a message
+	_, p, err := conn.ReadMessage()
+	if err != nil {
+		return err
+	}
 
-		MatchReqs.Lobby[req.Email] = conn
+	var req findMatchMsgStruct
+	err = json.Unmarshal(p, &req)
+	if err != nil {
+		return err
+	}
 
-		LobbyConnect(conn, req)
+	MatchReqs.Lobby[req.Email] = conn
+	Directory.EmailToSocketMap[req.Email] = conn
+
+	var found bool
+	found = false
+
+	for !found {
+		_, found = MatchReqs.Lobby[req.Email]
+		found = !found
+		text := LobbyConnect(conn, req)
+		if text != nil {
+
+			break
+		}
+		time.Sleep(time.Second)
 
 	}
+
+	return nil
 
 }
 
@@ -57,35 +76,45 @@ func LobbyEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	// upgrade this connection to a WebSocket
 	ws, err := upgrader.Upgrade(w, r, nil)
+	defer ws.Close()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = reader(ws)
+	err = findMatch(ws)
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-func LobbyConnect(conn *websocket.Conn, m MessageStruct) {
-	switch m.MessageType {
-	case "fetch_matches":
-		//send in array instead of sending individual
-		opponent := ""
-		for email, conn2 := range MatchReqs.Lobby {
-			if email != m.Email {
-				_ = conn2.WriteMessage(1, []byte("Your ooponent is "+m.Email))
-				_ = conn.WriteMessage(1, []byte("Your ooponent is "+email))
-			}
-		}
+func LobbyConnect(conn *websocket.Conn, m findMatchMsgStruct) []byte {
 
-		if opponent == "" {
-			_ = conn.WriteMessage(1, []byte("Please wait"))
-
-		} else {
+	opponent := ""
+	for email, conn2 := range MatchReqs.Lobby {
+		if email != m.Email {
+			opponent = email
 			delete(MatchReqs.Lobby, opponent)
 			delete(MatchReqs.Lobby, m.Email)
+
+			id, game := initGame(m.Email, opponent)
+			ActiveMatches.Match[id] = &game
+
+			text, _ := json.Marshal(game)
+
+			_ = conn.WriteMessage(1, []byte(text))
+			_ = conn2.WriteMessage(1, []byte(text))
+
 		}
 	}
+
+	if opponent != "" {
+		return []byte("found")
+	}
+	return nil
+
 }
+
+/*
+{"message_type":"find_match", "token":"abc", "email": "abc"}
+*/
