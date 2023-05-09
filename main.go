@@ -13,7 +13,7 @@ import (
 func initializeRouter() {
 	r := mux.NewRouter()
 	r.HandleFunc("/register", utils.Register).Methods("POST")
-	r.HandleFunc("/login", utils.Login).Methods("GET")
+	r.HandleFunc("/login", utils.Login).Methods("POST")
 	r.HandleFunc("/test", middleware.AuthMW(utils.Test)).Methods("GET")
 	r.HandleFunc("/forgot-password", utils.RequestForgotPassword)
 	r.HandleFunc("/refresh", utils.Refresh).Methods("GET").Methods("GET")

@@ -12,18 +12,19 @@ import (
 )
 
 type ChessGame struct {
-	ID                  int    `json:"id"`
-	WhitePlayerUserName string `json:"white_username"` // username
-	BlackPlayerUserName string `json:"black_username"`
-	whitePlayer         string // email
-	blackPlayer         string
+	ID                  int        `json:"id"`
+	WhitePlayerUserName string     `json:"white_username"` // username
+	BlackPlayerUserName string     `json:"black_username"`
+	WhitePlayer         string     `json:"white_email"`
+	BlackPlayer         string     `json:"black_email"`
 	gameMoves           []GameMove //list of moves
 
 	Result      uint8 `json:"result"`       // 0 -> black, 1 -> white, 2 -> draw
 	PendingDraw bool  `json:"pendind_draw"` //draw offer cnt
 	validator   *chess.Game
 
-	WhiteTurn bool `json:"white_move"` // white -> true
+	WhiteTurn   bool   `json:"white_move"` // white -> true
+	MessageType string `json:"message_type"`
 }
 
 type GameMove struct {
@@ -36,10 +37,12 @@ type GameMove struct {
 }
 
 type sndMoveStruct struct {
-	GameId int    `json:"game_id"`
-	Src    string `json:"src"`
-	Dest   string `json:"des"`
-	Prom   string `json:"prom"`
+	GameId      int    `json:"game_id"`
+	Src         string `json:"src"`
+	Dest        string `json:"des"`
+	Prom        string `json:"prom"`
+	MessageType string `json:"message_type"`
+	Fen         string `json:"fen"`
 }
 
 func initGame(player1, player2 string) (int, ChessGame) {
@@ -52,17 +55,18 @@ func initGame(player1, player2 string) (int, ChessGame) {
 	player2UserName = users[0].Username
 	// chess game struct
 	var game ChessGame
+	game.MessageType = "GAME_INIT"
 	game.ID = rand.Intn(999999)
 	if rand.Intn(2) == 0 {
 		game.WhitePlayerUserName = player1UserName
-		game.whitePlayer = player1
+		game.WhitePlayer = player1
 		game.BlackPlayerUserName = player2UserName
-		game.blackPlayer = player2
+		game.BlackPlayer = player2
 	} else {
 		game.BlackPlayerUserName = player1UserName
-		game.blackPlayer = player1
+		game.BlackPlayer = player1
 		game.WhitePlayerUserName = player2UserName
-		game.whitePlayer = player2
+		game.WhitePlayer = player2
 	}
 	// init struct
 
@@ -75,11 +79,11 @@ func initGame(player1, player2 string) (int, ChessGame) {
 func playMove(game *ChessGame, move GameMove) error {
 
 	if game.WhiteTurn {
-		if move.Email != game.whitePlayer {
+		if move.Email != game.WhitePlayer {
 			return errors.New("Not Your Turn")
 		}
 	} else {
-		if move.Email != game.blackPlayer {
+		if move.Email != game.BlackPlayer {
 			return errors.New("Not Your Turn")
 		}
 	}
@@ -93,23 +97,25 @@ func playMove(game *ChessGame, move GameMove) error {
 
 	// send move to opponent
 	moveSnd := sndMoveStruct{
-		GameId: game.ID,
-		Src:    move.Src,
-		Dest:   move.Dest,
-		Prom:   move.Prom,
+		GameId:      game.ID,
+		Src:         move.Src,
+		Dest:        move.Dest,
+		Prom:        move.Prom,
+		MessageType: "GAME_MOVE",
+		Fen:         game.validator.FEN(),
 	}
 
 	text, _ := json.Marshal(moveSnd)
 	if game.WhiteTurn {
-		Directory.EmailToSocketMap[game.blackPlayer].WriteMessage(1, []byte(text))
+		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte(text))
 	} else {
-		Directory.EmailToSocketMap[game.whitePlayer].WriteMessage(1, []byte(text))
+		Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte(text))
 	}
 	if game.validator.Outcome() != chess.NoOutcome {
 		// game end logic
 		gameEndLogic(game.ID)
-		Directory.EmailToSocketMap[game.blackPlayer].WriteMessage(1, []byte("game over"))
-		Directory.EmailToSocketMap[game.whitePlayer].WriteMessage(1, []byte("game over"))
+		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
+		Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
 	}
 
 	game.WhiteTurn = !game.WhiteTurn
@@ -140,14 +146,14 @@ func updateCnt(chessGame *ChessGame) {
 		chessGame.Result = 0
 		var users []models.User
 		// find black and add 1 to win counter
-		database.Instance.Where("email = ?", chessGame.blackPlayer).Find(&users)
+		database.Instance.Where("email = ?", chessGame.BlackPlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].WinCnt = users[0].WinCnt + 1
 		}
 		database.Instance.Save(users)
 		// find white and add 1 to loss counter
 
-		database.Instance.Where("email = ?", chessGame.whitePlayer).Find(&users)
+		database.Instance.Where("email = ?", chessGame.WhitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].LossCnt = users[0].LossCnt + 1
 		}
@@ -156,14 +162,14 @@ func updateCnt(chessGame *ChessGame) {
 		chessGame.Result = 1
 		var users []models.User
 		// find black and add 1 to win counter
-		database.Instance.Where("email = ?", chessGame.whitePlayer).Find(&users)
+		database.Instance.Where("email = ?", chessGame.WhitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].WinCnt = users[0].WinCnt + 1
 		}
 		database.Instance.Save(users)
 		// find white and add 1 to loss counter
 
-		database.Instance.Where("email = ?", chessGame.blackPlayer).Find(&users)
+		database.Instance.Where("email = ?", chessGame.BlackPlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].LossCnt = users[0].LossCnt + 1
 		}
@@ -172,13 +178,13 @@ func updateCnt(chessGame *ChessGame) {
 		chessGame.Result = 2
 		var users []models.User
 
-		database.Instance.Where("email = ?", chessGame.blackPlayer).Find(&users)
+		database.Instance.Where("email = ?", chessGame.BlackPlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].DrawCnt = users[0].DrawCnt + 1
 		}
 		database.Instance.Save(users)
 
-		database.Instance.Where("email = ?", chessGame.whitePlayer).Find(&users)
+		database.Instance.Where("email = ?", chessGame.WhitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].DrawCnt = users[0].DrawCnt + 1
 		}
@@ -191,8 +197,8 @@ func storeGame(moveCnt int, moves string, chessgame *ChessGame) error {
 	game := models.Match{
 		WhitePlayerUserName: chessgame.WhitePlayerUserName,
 		BlackPlayerUserName: chessgame.BlackPlayerUserName,
-		WhitePlayer:         chessgame.whitePlayer,
-		BlackPlayer:         chessgame.blackPlayer,
+		WhitePlayer:         chessgame.WhitePlayer,
+		BlackPlayer:         chessgame.BlackPlayer,
 		GameMoves:           moves,
 		Moves:               moveCnt,
 		Result:              chessgame.Result,

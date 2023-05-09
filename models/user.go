@@ -9,6 +9,7 @@ type User struct {
 	gorm.Model
 	Name     string `json:"name"`
 	Username string `json:"username" gorm:"unique"`
+	Country  string `json:"country"`
 	Email    string `json:"email" gorm:"unique"`
 	Password string `json:"password"`
 	WinCnt   int    `json:"win_cnt" gorm:"default:0"`

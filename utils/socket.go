@@ -48,12 +48,14 @@ func findMatch(conn *websocket.Conn) error {
 
 	// read in a message
 	_, p, err := conn.ReadMessage()
+
 	if err != nil {
 		return err
 	}
 
 	var req findMatchMsgStruct
 	err = json.Unmarshal(p, &req)
+	fmt.Println(req)
 	if err != nil {
 		return err
 	}
@@ -69,7 +71,6 @@ func findMatch(conn *websocket.Conn) error {
 		found = !found
 		text := LobbyConnect(conn, req)
 		if text != nil {
-
 			break
 		}
 		time.Sleep(time.Second)
@@ -120,13 +121,16 @@ func LobbyEndpoint(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-
+	fmt.Println("Coonected...")
 	err = findMatch(ws)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	err = getMoves(ws)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func LobbyConnect(conn *websocket.Conn, m findMatchMsgStruct) []byte {
