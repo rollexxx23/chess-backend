@@ -49,15 +49,17 @@ func AddMatch(w http.ResponseWriter, r *http.Request) {
 		database.Instance.Where("email = ?", blackPlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].WinCnt = users[0].WinCnt + 1
+			database.Instance.Save(users)
 		}
-		database.Instance.Save(users)
+
 		// find white and add 1 to loss counter
 
 		database.Instance.Where("email = ?", whitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].LossCnt = users[0].LossCnt + 1
+			database.Instance.Save(users)
 		}
-		database.Instance.Save(users)
+
 	} else if match.Result == 1 {
 
 		var users []models.User
@@ -65,15 +67,17 @@ func AddMatch(w http.ResponseWriter, r *http.Request) {
 		database.Instance.Where("email = ?", whitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].WinCnt = users[0].WinCnt + 1
+			database.Instance.Save(users)
 		}
-		database.Instance.Save(users)
+
 		// find white and add 1 to loss counter
 
 		database.Instance.Where("email = ?", blackPlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].LossCnt = users[0].LossCnt + 1
+			database.Instance.Save(users)
 		}
-		database.Instance.Save(users)
+
 	} else {
 
 		var users []models.User
@@ -81,14 +85,15 @@ func AddMatch(w http.ResponseWriter, r *http.Request) {
 		database.Instance.Where("email = ?", blackPlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].DrawCnt = users[0].DrawCnt + 1
+			database.Instance.Save(users)
 		}
-		database.Instance.Save(users)
 
 		database.Instance.Where("email = ?", whitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].DrawCnt = users[0].DrawCnt + 1
+			database.Instance.Save(users)
 		}
-		database.Instance.Save(users)
+
 	}
 
 }
