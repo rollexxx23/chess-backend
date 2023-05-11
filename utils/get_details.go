@@ -24,3 +24,12 @@ func GetMatchesByUserName(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(matches)
 }
+
+func GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	email := params["email"]
+	var users []models.User
+	database.Instance.Where("email = ?", email).Find(&users)
+	json.NewEncoder(w).Encode(users[0])
+
+}

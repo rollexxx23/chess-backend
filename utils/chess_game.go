@@ -18,10 +18,10 @@ type ChessGame struct {
 	WhitePlayer         string     `json:"white_email"`
 	BlackPlayer         string     `json:"black_email"`
 	gameMoves           []GameMove //list of moves
-
-	Result      uint8 `json:"result"`       // 0 -> black, 1 -> white, 2 -> draw
-	PendingDraw bool  `json:"pendind_draw"` //draw offer cnt
-	validator   *chess.Game
+	GameStates          string     `json:"game_states"`
+	Result              uint8      `json:"result"`       // 0 -> black, 1 -> white, 2 -> draw
+	PendingDraw         bool       `json:"pendind_draw"` //draw offer cnt
+	validator           *chess.Game
 
 	WhiteTurn   bool   `json:"white_move"` // white -> true
 	MessageType string `json:"message_type"`
@@ -73,6 +73,7 @@ func initGame(player1, player2 string) (int, ChessGame) {
 	game.gameMoves = nil
 	game.validator = chess.NewGame(chess.UseNotation(chess.UCINotation{}))
 	game.WhiteTurn = true
+	game.GameStates = ""
 	return game.ID, game
 }
 
@@ -104,7 +105,7 @@ func playMove(game *ChessGame, move GameMove) error {
 		MessageType: "GAME_MOVE",
 		Fen:         game.validator.FEN(),
 	}
-
+	game.GameStates += (game.validator.FEN() + ",")
 	text, _ := json.Marshal(moveSnd)
 	if game.WhiteTurn {
 		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte(text))
@@ -134,7 +135,7 @@ func gameEndLogic(id int) {
 	}
 	updateCnt(chessgame)
 	//gets length of all the moves in the game
-	totalMoves := (len(chessgame.gameMoves) + 1) / 2
+	totalMoves := len(chessgame.gameMoves)
 	storeGame(totalMoves, string(allMoves), chessgame)
 
 	//now delete game from memory
@@ -199,7 +200,7 @@ func storeGame(moveCnt int, moves string, chessgame *ChessGame) error {
 		BlackPlayerUserName: chessgame.BlackPlayerUserName,
 		WhitePlayer:         chessgame.WhitePlayer,
 		BlackPlayer:         chessgame.BlackPlayer,
-		GameMoves:           moves,
+		GameMoves:           chessgame.GameStates,
 		Moves:               moveCnt,
 		Result:              chessgame.Result,
 		Comment:             chessgame.validator.Outcome().String(),
