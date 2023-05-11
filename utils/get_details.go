@@ -25,6 +25,15 @@ func GetMatchesByUserName(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(matches)
 }
 
+func GetMatchesByEmail(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	email := params["email"]
+	var matches []models.Match
+	database.Instance.Where("white_player = ? OR black_player = ?", email, email).Find(&matches)
+
+	json.NewEncoder(w).Encode(matches)
+}
+
 func GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	email := params["email"]

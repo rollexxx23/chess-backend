@@ -21,6 +21,7 @@ func initializeRouter() {
 	r.HandleFunc("/lobby", utils.LobbyEndpoint)
 	r.HandleFunc("/matches", utils.GetMatches).Methods("GET")
 	r.HandleFunc("/matches/{username}", utils.GetMatchesByUserName).Methods("GET")
+	r.HandleFunc("/matches/email/{email}", utils.GetMatchesByEmail).Methods("GET")
 	r.HandleFunc("/users/{email}", utils.GetUserByEmail).Methods("GET")
 	r.HandleFunc("/match/add", utils.AddMatch).Methods("POST")
 	log.Fatal(http.ListenAndServe(":5000", r))
