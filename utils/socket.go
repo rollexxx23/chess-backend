@@ -87,7 +87,10 @@ func getMoves(conn *websocket.Conn) error {
 		if err != nil {
 			return err
 		}
-
+		s := string(p[:])
+		if s == ("game over") {
+			return nil
+		}
 		var req movesMsgStruct
 		err = json.Unmarshal(p, &req)
 		if err != nil {
@@ -104,11 +107,18 @@ func getMoves(conn *websocket.Conn) error {
 
 		game := ActiveMatches.Match[req.GameId]
 
-		err = playMove(game, move)
-		if err != nil {
-			fmt.Println(err)
+		res := playMove(game, move)
+
+		if res {
+			Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
+			Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
+			break
+
 		}
+
 	}
+
+	return nil
 
 }
 

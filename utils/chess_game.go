@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 
@@ -77,15 +76,17 @@ func initGame(player1, player2 string) (int, ChessGame) {
 	return game.ID, game
 }
 
-func playMove(game *ChessGame, move GameMove) error {
+func playMove(game *ChessGame, move GameMove) bool {
 
 	if game.WhiteTurn {
 		if move.Email != game.WhitePlayer {
-			return errors.New("Not Your Turn")
+			fmt.Println("Not Your Turn")
+			return false
 		}
 	} else {
 		if move.Email != game.BlackPlayer {
-			return errors.New("Not Your Turn")
+			fmt.Println("Not Your Turn")
+			return false
 		}
 	}
 
@@ -93,7 +94,7 @@ func playMove(game *ChessGame, move GameMove) error {
 
 	if err != nil {
 		fmt.Println("Could not decode", err, move.Src+move.Dest+move.Prom)
-		return err
+		return false
 	}
 
 	// send move to opponent
@@ -117,12 +118,13 @@ func playMove(game *ChessGame, move GameMove) error {
 		gameEndLogic(game.ID)
 		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
 		Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
+		return true
 	}
 
 	game.WhiteTurn = !game.WhiteTurn
 	game.gameMoves = append(game.gameMoves, move)
 
-	return nil
+	return false
 }
 
 func gameEndLogic(id int) {
