@@ -78,6 +78,12 @@ func initGame(player1, player2 string) (int, ChessGame) {
 
 func playMove(game *ChessGame, move GameMove) bool {
 
+	if move.Src == "" && move.Dest == "" {
+		// game forfeit logic
+		gameForfeitLogic(game.ID, move.Email)
+		return true
+	}
+
 	if game.WhiteTurn {
 		if move.Email != game.WhitePlayer {
 			fmt.Println("Not Your Turn")
@@ -164,13 +170,13 @@ func updateCnt(chessGame *ChessGame) {
 	} else if chessGame.validator.Outcome() == chess.WhiteWon {
 		chessGame.Result = 1
 		var users []models.User
-		// find black and add 1 to win counter
+		// find white and add 1 to win counter
 		database.Instance.Where("email = ?", chessGame.WhitePlayer).Find(&users)
 		if len(users) != 0 {
 			users[0].WinCnt = users[0].WinCnt + 1
 		}
 		database.Instance.Save(users)
-		// find white and add 1 to loss counter
+		// find black and add 1 to loss counter
 
 		database.Instance.Where("email = ?", chessGame.BlackPlayer).Find(&users)
 		if len(users) != 0 {
@@ -193,6 +199,54 @@ func updateCnt(chessGame *ChessGame) {
 		}
 		database.Instance.Save(users)
 	}
+}
+
+func gameForfeitLogic(id int, email string) {
+	chessGame := ActiveMatches.Match[id]
+	if email == chessGame.WhitePlayer {
+		chessGame.Result = 0
+		var users []models.User
+		// find black and add 1 to win counter
+		database.Instance.Where("email = ?", chessGame.BlackPlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].WinCnt = users[0].WinCnt + 1
+		}
+		database.Instance.Save(users)
+		// find white and add 1 to loss counter
+
+		database.Instance.Where("email = ?", chessGame.WhitePlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].LossCnt = users[0].LossCnt + 1
+		}
+		database.Instance.Save(users)
+	} else {
+		chessGame.Result = 1
+		var users []models.User
+		// find white and add 1 to win counter
+		database.Instance.Where("email = ?", chessGame.WhitePlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].WinCnt = users[0].WinCnt + 1
+		}
+		database.Instance.Save(users)
+		// find black and add 1 to loss counter
+
+		database.Instance.Where("email = ?", chessGame.BlackPlayer).Find(&users)
+		if len(users) != 0 {
+			users[0].LossCnt = users[0].LossCnt + 1
+		}
+		database.Instance.Save(users)
+	}
+	allMoves, err := json.Marshal(chessGame.gameMoves)
+	if err != nil {
+		fmt.Println("Error marshalling data to store in MySQL")
+	}
+	//gets length of all the moves in the game
+	totalMoves := len(chessGame.gameMoves)
+	storeGame(totalMoves, string(allMoves), chessGame)
+
+	//now delete game from memory
+	delete(ActiveMatches.Match, id)
+
 }
 
 func storeGame(moveCnt int, moves string, chessgame *ChessGame) error {
