@@ -12,7 +12,7 @@ import (
 )
 
 type mwStruct struct {
-	Email string
+	Email string `json:"email"`
 }
 
 var jwtKey = []byte("secret_key")
