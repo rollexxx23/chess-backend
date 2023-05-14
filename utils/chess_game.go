@@ -81,6 +81,8 @@ func playMove(game *ChessGame, move GameMove) bool {
 	if move.Src == "" && move.Dest == "" {
 		// game forfeit logic
 		gameForfeitLogic(game.ID, move.Email)
+		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
+		Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
 		return true
 	}
 

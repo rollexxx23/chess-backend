@@ -89,6 +89,7 @@ func getMoves(conn *websocket.Conn) error {
 		}
 		s := string(p[:])
 		if s == ("game over") {
+			fmt.Println("game over detected")
 			return nil
 		}
 		var req movesMsgStruct
@@ -110,8 +111,7 @@ func getMoves(conn *websocket.Conn) error {
 		res := playMove(game, move)
 
 		if res {
-			Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
-			Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
+
 			break
 
 		}
