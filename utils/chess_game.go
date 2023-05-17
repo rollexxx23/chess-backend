@@ -155,6 +155,8 @@ func gameEndLogic(id int) {
 
 	//now delete game from memory
 	delete(ActiveMatches.Match, id)
+	delete(Directory.EmailToSocketMap, chessgame.WhitePlayer)
+	delete(Directory.EmailToSocketMap, chessgame.BlackPlayer)
 }
 
 func updateCnt(chessGame *ChessGame) {
@@ -291,6 +293,8 @@ func gameForfeitLogic(id int, email string) {
 
 	//now delete game from memory
 	delete(ActiveMatches.Match, id)
+	delete(Directory.EmailToSocketMap, chessGame.WhitePlayer)
+	delete(Directory.EmailToSocketMap, chessGame.BlackPlayer)
 
 }
 
