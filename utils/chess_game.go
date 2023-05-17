@@ -44,6 +44,13 @@ type sndMoveStruct struct {
 	Fen         string `json:"fen"`
 }
 
+type sendStatusStruct struct {
+	GameId      int    `json:"game_id"`
+	MessageType string `json:"message_type"`
+	Result      string `json:"result"`
+	Forfeited   bool   `json:"forfeited"`
+}
+
 func initGame(player1, player2 string) (int, ChessGame) {
 	var users []models.User
 	var player1UserName, player2UserName string
@@ -81,8 +88,7 @@ func playMove(game *ChessGame, move GameMove) bool {
 	if move.Src == "" && move.Dest == "" {
 		// game forfeit logic
 		gameForfeitLogic(game.ID, move.Email)
-		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
-		Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
+
 		return true
 	}
 
@@ -124,8 +130,7 @@ func playMove(game *ChessGame, move GameMove) bool {
 	if game.validator.Outcome() != chess.NoOutcome {
 		// game end logic
 		gameEndLogic(game.ID)
-		Directory.EmailToSocketMap[game.BlackPlayer].WriteMessage(1, []byte("game over"))
-		Directory.EmailToSocketMap[game.WhitePlayer].WriteMessage(1, []byte("game over"))
+
 		return true
 	}
 
@@ -153,7 +158,24 @@ func gameEndLogic(id int) {
 }
 
 func updateCnt(chessGame *ChessGame) {
+	gameStatusWin := sendStatusStruct{
+		GameId:      chessGame.ID,
+		MessageType: "GAME_STATUS",
+		Result:      "Win",
+		Forfeited:   false,
+	}
+	text1, _ := json.Marshal(gameStatusWin)
+
+	gameStatusLoss := sendStatusStruct{
+		GameId:      chessGame.ID,
+		MessageType: "GAME_STATUS",
+		Result:      "Win",
+		Forfeited:   false,
+	}
+	text2, _ := json.Marshal(gameStatusLoss)
 	if chessGame.validator.Outcome() == chess.BlackWon {
+		Directory.EmailToSocketMap[chessGame.BlackPlayer].WriteMessage(1, []byte(text1))
+		Directory.EmailToSocketMap[chessGame.WhitePlayer].WriteMessage(1, []byte(text2))
 		chessGame.Result = 0
 		var users []models.User
 		// find black and add 1 to win counter
@@ -170,6 +192,8 @@ func updateCnt(chessGame *ChessGame) {
 		}
 		database.Instance.Save(users)
 	} else if chessGame.validator.Outcome() == chess.WhiteWon {
+		Directory.EmailToSocketMap[chessGame.BlackPlayer].WriteMessage(1, []byte(text2))
+		Directory.EmailToSocketMap[chessGame.WhitePlayer].WriteMessage(1, []byte(text1))
 		chessGame.Result = 1
 		var users []models.User
 		// find white and add 1 to win counter
@@ -186,6 +210,15 @@ func updateCnt(chessGame *ChessGame) {
 		}
 		database.Instance.Save(users)
 	} else {
+		gameStatus := sendStatusStruct{
+			GameId:      chessGame.ID,
+			MessageType: "GAME_STATUS",
+			Result:      "Draw",
+			Forfeited:   false,
+		}
+		text, _ := json.Marshal(gameStatus)
+		Directory.EmailToSocketMap[chessGame.BlackPlayer].WriteMessage(1, []byte(text))
+		Directory.EmailToSocketMap[chessGame.WhitePlayer].WriteMessage(1, []byte(text))
 		chessGame.Result = 2
 		var users []models.User
 
@@ -205,7 +238,16 @@ func updateCnt(chessGame *ChessGame) {
 
 func gameForfeitLogic(id int, email string) {
 	chessGame := ActiveMatches.Match[id]
+	gameStatus := sendStatusStruct{
+		GameId:      id,
+		MessageType: "GAME_STATUS",
+		Result:      "Win",
+		Forfeited:   true,
+	}
+	text, _ := json.Marshal(gameStatus)
 	if email == chessGame.WhitePlayer {
+
+		Directory.EmailToSocketMap[chessGame.BlackPlayer].WriteMessage(1, []byte(text))
 		chessGame.Result = 0
 		var users []models.User
 		// find black and add 1 to win counter
@@ -222,6 +264,7 @@ func gameForfeitLogic(id int, email string) {
 		}
 		database.Instance.Save(users)
 	} else {
+		Directory.EmailToSocketMap[chessGame.WhitePlayer].WriteMessage(1, []byte(text))
 		chessGame.Result = 1
 		var users []models.User
 		// find white and add 1 to win counter
